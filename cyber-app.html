@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赛博倒计时 // 系统多重任务</title>
+    <style>
+        :root {
+            --neon-pink: #ff00ff;
+            --neon-blue: #00f2ff;
+            --neon-yellow: #f3f315;
+            --main-bg: #0a0a0c;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--main-bg);
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        /* 动态背景图 */
+        .cyber-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: 
+                linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)),
+                url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            z-index: -2;
+            filter: saturate(1.5) brightness(0.7);
+        }
+
+        /* 扫描线 */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,.1) 50%);
+            background-size: 100% 4px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 玻璃面板 */
+        .glass-panel {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px 60px;
+            border-left: 4px solid var(--neon-pink);
+            border-right: 4px solid var(--neon-blue);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 1);
+            position: relative;
+            backdrop-filter: blur(15px);
+            clip-path: polygon(5% 0, 100% 0, 100% 85%, 95% 100%, 0 100%, 0 15%);
+            min-width: 600px;
+        }
+
+        /* 主标题及状态 */
+        .header {
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+            color: var(--neon-blue);
+            border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* 主倒计时样式 */
+        .main-countdown {
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+
+        .main-countdown .num {
+            font-size: 5rem;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 0 15px var(--neon-pink);
+            font-family: 'Courier New', monospace;
+        }
+
+        .main-countdown .label {
+            color: var(--neon-blue);
+            font-size: 0.9rem;
+        }
+
+        /* 次级倒计时区域 (周五协议) */
+        .secondary-zone {
+            border-top: 1px dashed rgba(243, 243, 21, 0.3);
+            padding-top: 20px;
+            text-align: center;
+        }
+
+        .sec-title {
+            color: var(--neon-yellow);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .sec-countdown {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            color: var(--neon-yellow);
+            opacity: 0.9;
+        }
+
+        .sec-num {
+            font-size: 1.8rem;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .sec-label {
+            font-size: 0.7rem;
+            margin-left: 3px;
+        }
+
+        /* 动画 */
+        .blink { animation: blink-anim 1s infinite alternate; }
+        @keyframes blink-anim { 
+            from { opacity: 1; } to { opacity: 0.3; } 
+        }
+
+        .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            left: 2px;
+            text-shadow: -2px 0 var(--neon-pink);
+            background: black;
+            overflow: hidden;
+            clip: rect(0, 900px, 0, 0);
+            animation: glitch-loop 3s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-loop {
+            0% { clip: rect(10px, 9999px, 20px, 0); }
+            100% { clip: rect(30px, 9999px, 40px, 0); }
+        }
+
+        .footer-tag {
+            position: absolute;
+            bottom: 15px;
+            right: 30px;
+            font-size: 0.6rem;
+            color: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cyber-bg"></div>
+    <div class="scanlines"></div>
+
+    <div class="container">
+        <div class="glass-panel">
+            <div class="header glitch-text" id="main-title" data-text="正在追踪次日任务目标...">正在追踪次日任务目标...</div>
+            
+            <!-- 主倒计时 -->
+            <div class="main-countdown">
+                <div><span class="num" id="m-h">00</span><span class="label">时</span></div>
+                <div class="num blink" style="font-size: 3rem;">:</div>
+                <div><span class="num" id="m-m">00</span><span class="label">分</span></div>
+                <div class="num blink" style="font-size: 3rem;">:</div>
+                <div><span class="num" id="m-s">00</span><span class="label">秒</span></div>
+            </div>
+
+            <!-- 次级倒计时 (周五下午7点进度) -->
+            <div class="secondary-zone">
+                <div class="sec-title">距离「周五 19:00」协议 解锁还有：</div>
+                <div class="sec-countdown">
+                    <div><span class="sec-num" id="s-d">0</span><span class="sec-label">天</span></div>
+                    <div><span class="sec-num" id="s-h">00</span><span class="sec-label">时</span></div>
+                    <div><span class="sec-num" id="s-m">00</span><span class="sec-label">分</span></div>
+                    <div><span class="sec-num" id="s-s">00</span><span class="sec-label">秒</span></div>
+                </div>
+            </div>
+
+            <div class="footer-tag">STATUS: ENCRYPTED // NODE_77</div>
+        </div>
+    </div>
+
+    <script>
+        function updateAllCountdowns() {
+            const now = new Date();
+            
+            // --- 1. 主倒计时逻辑 (周一-四 20:30, 周五 19:00) ---
+            const mainTarget = calculateMainTarget(now);
+            const mainDiff = mainTarget - now;
+            
+            // --- 2. 周五 19:00 专项倒计时逻辑 ---
+            const fridayTarget = calculateFridayTarget(now);
+            const friDiff = fridayTarget - now;
+
+            // 更新 UI
+            displayTime(mainDiff, 'm');
+            displayTime(friDiff, 's', true); // 特别处理“天”
+
+            // 更新主标题
+            updateMainTitle(now);
+        }
+
+        function calculateMainTarget(now) {
+            const day = now.getDay(); 
+            let target = new Date(now);
+            if (day >= 1 && day <= 4) {
+                target.setHours(20, 30, 0, 0);
+                if (now > target) target.setDate(now.getDate() + 1);
+                // 如果加完后变成周五，修正为19点
+                if (target.getDay() === 5) target.setHours(19, 0, 0, 0);
+            } else if (day === 5) {
+                target.setHours(19, 0, 0, 0);
+                if (now > target) {
+                    target.setDate(now.getDate() + 3);
+                    target.setHours(20, 30, 0, 0);
+                }
+            } else {
+                let diff = (day === 6) ? 2 : 1;
+                target.setDate(now.getDate() + diff);
+                target.setHours(20, 30, 0, 0);
+            }
+            return target;
+        }
+
+        function calculateFridayTarget(now) {
+            const day = now.getDay();
+            let target = new Date(now);
+            // 计算到周五(5)还有几天
+            let daysToFriday = (5 - day + 7) % 7;
+            
+            // 如果今天是周五且已经过了19点，则找下周五
+            if (daysToFriday === 0 && (now.getHours() >= 19)) {
+                daysToFriday = 7;
+            }
+            
+            target.setDate(now.getDate() + daysToFriday);
+            target.setHours(19, 0, 0, 0);
+            return target;
+        }
+
+        function displayTime(diff, prefix, showDays = false) {
+            if (diff < 0) diff = 0;
+            
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            const m = Math.floor((diff / (1000 * 60)) % 60);
+            const s = Math.floor((diff / 1000) % 60);
+
+            // 如果是主倒计时，小时需要累加天数(不显示天数标签)
+            if (!showDays) {
+                const totalH = Math.floor(diff / (1000 * 60 * 60));
+                document.getElementById(`${prefix}-h`).innerText = totalH.toString().padStart(2, '0');
+            } else {
+                document.getElementById(`${prefix}-d`).innerText = d;
+                document.getElementById(`${prefix}-h`).innerText = h.toString().padStart(2, '0');
+            }
+            
+            document.getElementById(`${prefix}-m`).innerText = m.toString().padStart(2, '0');
+            document.getElementById(`${prefix}-s`).innerText = s.toString().padStart(2, '0');
+        }
+
+        function updateMainTitle(now) {
+            const day = now.getDay();
+            let text = "";
+            if (day >= 1 && day <= 4) text = "常规任务序列 // 目标 20:30";
+            else if (day === 5) text = "周五协议已激活 // 目标 19:00";
+            else text = "核心系统待机 // 倒计时至周一";
+            
+            const el = document.getElementById('main-title');
+            el.innerText = text;
+            el.setAttribute('data-text', text);
+        }
+
+        setInterval(updateAllCountdowns, 1000);
+        updateAllCountdowns();
+    </script>
+</body>
+</html>
